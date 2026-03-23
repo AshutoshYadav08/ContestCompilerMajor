@@ -1,0 +1,12 @@
+{
+  "name": "contest-compiler-backend-api",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy"
+  },
+  "dependencies": {
+    "convex": "latest",
+    "svix": "^1.49.0"
+  }
+}
