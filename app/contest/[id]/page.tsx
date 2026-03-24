@@ -7,6 +7,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { PageScaffold } from "@/components/PageScaffold";
 import { useAuth } from "@/context/AuthContext";
 import { ContestResponse, fetchContestDetail, reviewJoinRequest, sendJoinRequest } from "@/lib/apiClient";
+import { getUserDisplayName, getUserSecondaryLabel } from "@/lib/userDisplay";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -32,6 +33,7 @@ export default function ContestViewPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<OrganiserTab>("standings");
   const [eventsSeenAt, setEventsSeenAt] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<ContestResponse["events"][number] | null>(null);
   const eventsSeenKey = `contest:${id}:events-seen:${user?.id ?? "anon"}`;
 
   const load = useCallback(async () => {
@@ -59,8 +61,10 @@ export default function ContestViewPage() {
 
   const isOrganiser = user?.id === detail?.contest.organiserId;
   const isParticipantAllowed = detail?.contest.participants.includes(user?.id ?? "") ?? false;
+  const canOpenProblems = Boolean(isOrganiser || isParticipantAllowed || participantRequest?.status === "approved");
   const visibleStandings = isOrganiser ? detail?.standings ?? [] : detail?.publicStandings ?? [];
   const pendingLobbyCount = detail?.joinRequests.filter((request) => request.status === "pending").length ?? 0;
+  const canRequestJoin = Boolean(user) && !isOrganiser && !isParticipantAllowed && detail?.phase !== "ended";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -91,8 +95,8 @@ export default function ContestViewPage() {
     return detail.events.filter((event) => new Date(event.submittedAt).getTime() > new Date(eventsSeenAt).getTime()).length;
   }, [detail, eventsSeenAt]);
 
-
   const copyInviteLink = async () => {
+    if (typeof window === "undefined" || !detail) return;
     const inviteUrl = `${window.location.origin}/contest/${detail.contest.id}`;
     try {
       await navigator.clipboard.writeText(inviteUrl);
@@ -102,11 +106,53 @@ export default function ContestViewPage() {
     }
   };
 
-  useEffect(() => {
-    if (!user || activeRole !== "participant" || !detail || isOrganiser) return;
-    if (isParticipantAllowed || participantRequest) return;
-    sendJoinRequest(detail.contest.id).then(load).catch(() => undefined);
-  }, [detail, isOrganiser, isParticipantAllowed, participantRequest, user, load, activeRole]);
+
+
+  const submissionCodeModal = selectedSubmission ? (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 px-5 py-4">
+          <div>
+            <p className="text-lg font-semibold text-slate-100">Submitted code</p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span>{selectedSubmission.participantName ?? selectedSubmission.participantId}</span>
+              <span>•</span>
+              <span>{selectedSubmission.problemId}</span>
+              <span>•</span>
+              <span>{selectedSubmission.language}</span>
+              <span>•</span>
+              <span>{new Date(selectedSubmission.submittedAt).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(selectedSubmission.sourceCode ?? "");
+                } catch {}
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:border-slate-500"
+            >
+              <CopyIcon size={14} />
+              Copy code
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedSubmission(null)}
+              className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          <pre className="min-h-full overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-black/40 p-4 text-sm leading-6 text-emerald-100">{selectedSubmission.sourceCode || "// Submitted code unavailable"}</pre>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
 
   if (loading) return <LoadingState label="Loading contest details..." />;
   if (error || !detail) return <div className="text-rose-400">{error || "No data"}</div>;
@@ -119,11 +165,9 @@ export default function ContestViewPage() {
         <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2 py-1"><CalendarIcon size={12} /> {detail.phase}</span>
         <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2 py-1"><UsersIcon size={12} /> {detail.contest.participants.length} participants</span>
       </div>
-      {isOrganiser ? (
-        <p className="text-xs text-slate-400">Manage requests, standings, and live activity from one place.</p>
-      ) : (
-        <p className="text-xs text-slate-400">Track the contest, open problems, and watch your standing here.</p>
-      )}
+      <p className="text-xs text-slate-400">
+        {isOrganiser ? "Review registrations, standings, and recent submissions from one place." : "Check contest details, open problems, and follow your progress here."}
+      </p>
       {!isOrganiser && detail.leaderboard.isFrozen && (
         <p className="text-xs text-amber-300">Standings are frozen until the contest ends.</p>
       )}
@@ -132,7 +176,7 @@ export default function ContestViewPage() {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      {detail.phase === "running" ? (
+      {detail.phase !== "ended" ? (
         <button
           type="button"
           onClick={copyInviteLink}
@@ -154,26 +198,30 @@ export default function ContestViewPage() {
     ];
 
     return (
-      <PageScaffold title={title} titleIcon={<TrophyIcon />} description={description} actions={headerActions} bodyClassName="space-y-4">
-        <div className="sticky top-0 z-10 -mx-4 border-b border-slate-800 bg-slate-950/95 px-4 pb-4 pt-0 backdrop-blur"><div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                activeTab === tab.key ? "bg-emerald-700 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-              {tab.badge ? <StatusBadge tone={tab.key === "events" ? "blue" : "amber"}>{tab.badge}</StatusBadge> : null}
-            </button>
-          ))}
-        </div></div>
+      <>
+        {submissionCodeModal}
+        <PageScaffold title={title} titleIcon={<TrophyIcon />} description={description} actions={headerActions} bodyClassName="space-y-4">
+        <div className="sticky top-0 z-10 -mx-3 sm:-mx-4 border-b border-slate-800 bg-slate-950/95 px-3 sm:px-4 pb-4 pt-0 backdrop-blur">
+          <div className="flex flex-wrap gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  activeTab === tab.key ? "bg-emerald-700 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                {tab.badge ? <StatusBadge tone={tab.key === "events" ? "blue" : "amber"}>{tab.badge}</StatusBadge> : null}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {activeTab === "standings" && (
-          <InfoCard title="Standings (Realtime)">
+          <InfoCard title="Standings (live)">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-400">
@@ -207,42 +255,54 @@ export default function ContestViewPage() {
         )}
 
         {activeTab === "lobby" && (
-          <InfoCard title="Lobby (Join Requests)">
+          <InfoCard title="Lobby (join requests)">
             <ul className="space-y-2 text-sm">
-              {detail.joinRequests.map((request) => (
-                <li key={request.id} className="rounded-xl bg-slate-900 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
-                      <span className="font-medium text-slate-100">{request.participant?.name ?? request.participantId}</span>
-                      <StatusBadge tone={request.status === "pending" ? "amber" : request.status === "approved" ? "emerald" : "rose"}>{request.status}</StatusBadge>
-                    </span>
-                    {request.status === "pending" && (
-                      <span className="flex gap-2">
-                        <button className="rounded-xl bg-emerald-700 px-3 py-1.5" onClick={async () => { await reviewJoinRequest(request.id, "approved"); await load(); }}>Approve</button>
-                        <button className="rounded-xl bg-rose-700 px-3 py-1.5" onClick={async () => { await reviewJoinRequest(request.id, "rejected"); await load(); }}>Reject</button>
+              {detail.joinRequests.map((request) => {
+                const primary = getUserDisplayName(request.participant);
+                const secondary = getUserSecondaryLabel(request.participant);
+                return (
+                  <li key={request.id} className="rounded-xl bg-slate-900 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-slate-100">{primary}</span>
+                          {secondary ? <span className="block truncate text-xs text-slate-400">{secondary}</span> : null}
+                        </span>
+                        <StatusBadge tone={request.status === "pending" ? "amber" : request.status === "approved" ? "emerald" : "rose"}>{request.status}</StatusBadge>
                       </span>
-                    )}
-                  </div>
-                </li>
-              ))}
-              {detail.joinRequests.length === 0 && <li className="text-slate-400">No join requests.</li>}
+                      {request.status === "pending" && (
+                        <span className="flex gap-2">
+                          <button className="rounded-xl bg-emerald-700 px-3 py-1.5" onClick={async () => { await reviewJoinRequest(request.id, "approved"); await load(); }}>Approve</button>
+                          <button className="rounded-xl bg-rose-700 px-3 py-1.5" onClick={async () => { await reviewJoinRequest(request.id, "rejected"); await load(); }}>Reject</button>
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+              {detail.joinRequests.length === 0 && <li className="text-slate-400">No join requests yet.</li>}
             </ul>
           </InfoCard>
         )}
 
         {activeTab === "events" && (
-          <InfoCard title="Events (Submissions Feed)">
+          <InfoCard title="Events (submissions feed)">
             <ul className="space-y-2 text-sm">
               {detail.events.slice().reverse().map((event) => {
                 const isNew = eventsSeenAt ? new Date(event.submittedAt).getTime() > new Date(eventsSeenAt).getTime() : false;
                 return (
                   <li key={event.id} className="rounded-xl bg-slate-900 p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span>[{new Date(event.submittedAt).toLocaleTimeString()}] {event.participantName ?? event.participantId} → {event.problemId}</span>
-                      <StatusBadge tone={event.pipelineStatus === "judged" ? (event.verdict === "Accepted" ? "emerald" : "rose") : "amber"}>
-                        {event.pipelineStatus === "judged" ? event.verdict ?? event.status : event.status}
-                      </StatusBadge>
-                      {isNew ? <StatusBadge tone="blue">new</StatusBadge> : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>[{new Date(event.submittedAt).toLocaleTimeString()}] {event.participantName ?? event.participantId} → {event.problemId}</span>
+                        <StatusBadge tone={event.pipelineStatus === "judged" ? (event.verdict === "Accepted" ? "emerald" : "rose") : "amber"}>
+                          {event.pipelineStatus === "judged" ? event.verdict ?? event.status : event.status}
+                        </StatusBadge>
+                        {isNew ? <StatusBadge tone="blue">new</StatusBadge> : null}
+                      </div>
+                      <button type="button" onClick={() => setSelectedSubmission(event)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-100 hover:border-slate-500">
+                        View code
+                      </button>
                     </div>
                   </li>
                 );
@@ -253,7 +313,7 @@ export default function ContestViewPage() {
         )}
 
         {activeTab === "stats" && (
-          <InfoCard title="Problem Stats">
+          <InfoCard title="Problem stats">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {detail.problemStats.map((stat) => (
                 <div key={stat.problemId} className="rounded-xl bg-slate-900 p-3 text-sm">
@@ -268,16 +328,42 @@ export default function ContestViewPage() {
           </InfoCard>
         )}
       </PageScaffold>
+      </>
     );
   }
 
   const statusCard = () => {
-    if (isParticipantAllowed || participantRequest?.status === "approved") return null;
+    if (isParticipantAllowed || participantRequest?.status === "approved" || isOrganiser) return null;
+
+    if (detail.phase === "ended") {
+      return (
+        <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4">
+          <p className="font-medium text-slate-100">This contest has ended.</p>
+          <p className="mt-1 text-sm text-slate-400">New participants cannot join after the contest is over.</p>
+        </div>
+      );
+    }
+
+    if (!user) {
+      return (
+        <div className="rounded-xl border border-blue-600/40 bg-blue-950/40 p-4">
+          <p className="font-medium text-blue-100">Sign in to join this contest.</p>
+          <p className="mt-1 text-sm text-blue-100/80">Once you sign in, you can send a join request from this page.</p>
+          <Link
+            href={`/sign-in?redirect_url=${encodeURIComponent(`/contest/${detail.contest.id}`)}`}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-600"
+          >
+            <CheckCircleIcon size={16} /> Sign in to continue
+          </Link>
+        </div>
+      );
+    }
+
     if (participantRequest?.status === "rejected") {
       return (
         <div className="rounded-xl border border-rose-600 bg-rose-950/40 p-4">
           <p className="font-medium text-rose-200">Your join request was rejected.</p>
-          <p className="mt-1 text-sm text-rose-100/90">You can request to join again if you still want to participate.</p>
+          <p className="mt-1 text-sm text-rose-100/90">You can send a new request if you still want to participate.</p>
           <button
             className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-3 py-2 text-sm font-medium text-white hover:bg-rose-600"
             onClick={async () => {
@@ -291,25 +377,62 @@ export default function ContestViewPage() {
         </div>
       );
     }
+
+    if (participantRequest?.status === "pending") {
+      return (
+        <div className="rounded-xl border border-amber-600 bg-amber-950 p-4">
+          <p>Your join request has been sent.</p>
+          <p className="mt-2 text-xs text-amber-200">Your join request is pending approval.</p>
+        </div>
+      );
+    }
+
+    if (!canRequestJoin) return null;
+
     return (
-      <div className="rounded-xl border border-amber-600 bg-amber-950 p-4">
-        <p>Waiting for host to let you in...</p>
-        <p className="mt-2 text-xs text-amber-200">Your join request is pending approval.</p>
+      <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4">
+        <p className="font-medium text-slate-100">You are not part of this contest yet.</p>
+        <p className="mt-1 text-sm text-slate-400">Send a join request to participate in this contest.</p>
+        <button
+          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+          onClick={async () => {
+            if (!user) return;
+            await sendJoinRequest(detail.contest.id);
+            await load();
+          }}
+        >
+          <CheckCircleIcon size={16} /> Request to join
+        </button>
       </div>
     );
   };
 
   return (
-    <PageScaffold title={title} titleIcon={<UsersIcon />} description={description} actions={headerActions} bodyClassName="space-y-4">
+    <>
+      {submissionCodeModal}
+      <PageScaffold title={title} titleIcon={<UsersIcon />} description={description} actions={headerActions} bodyClassName="space-y-4">
       {statusCard()}
 
-      {(isParticipantAllowed || participantRequest?.status === "approved") && (
+      {canOpenProblems && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <p className="text-sm text-slate-400">Contest phase</p>
-          <p className="mt-1 text-lg font-semibold text-slate-100 capitalize">{detail.phase}</p>
-          {detail.phase === "upcoming" && <p className="mt-2 text-sm text-slate-400">Countdown active. Start time: {new Date(detail.contest.startTime).toLocaleString()}</p>}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm text-slate-400">Contest phase</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100 capitalize">{detail.phase}</p>
+              {detail.phase === "upcoming" && <p className="mt-2 text-sm text-slate-400">Starts at {new Date(detail.contest.startTime).toLocaleString()}</p>}
+            </div>
+            {detail.phase !== "ended" ? (
+              <button
+                type="button"
+                onClick={copyInviteLink}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500"
+              >
+                <CopyIcon size={15} className="mr-2" /> Invite to contest
+              </button>
+            ) : null}
+          </div>
           {detail.phase !== "upcoming" && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {detail.problems.map((problem) => (
                 <Link key={problem.id} href={`/contest/${detail.contest.id}/${problem.id}`} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:border-slate-600">
                   <div className="flex items-center justify-between gap-2">
@@ -324,7 +447,7 @@ export default function ContestViewPage() {
         </div>
       )}
 
-      <InfoCard title={detail.leaderboard.isFrozen ? "Leaderboard (Frozen for participants)" : "Your Standing Snapshot"}>
+      <InfoCard title={detail.leaderboard.isFrozen ? "Leaderboard (frozen for participants)" : "Standings"}>
         <ul className="space-y-1 text-sm">
           {visibleStandings.slice(0, 10).map((row) => (
             <li key={row.participantId} className={row.participantId === user?.id ? "text-emerald-200" : "text-slate-200"}>
@@ -335,5 +458,6 @@ export default function ContestViewPage() {
         </ul>
       </InfoCard>
     </PageScaffold>
+    </>
   );
 }

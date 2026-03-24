@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertIcon, CheckCircleIcon, CopyIcon } from "@/components/Icons";
 import { LoadingState } from "@/components/LoadingState";
 import { MonacoCodeEditor } from "@/components/MonacoCodeEditor";
 import { useAuth } from "@/context/AuthContext";
@@ -102,7 +103,7 @@ export default function ProblemPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const [leftWidth, setLeftWidth] = useState(43);
-  const [editorHeight, setEditorHeight] = useState(62);
+  const [editorHeight, setEditorHeight] = useState(56);
   const [dragging, setDragging] = useState<null | "vertical" | "horizontal">(null);
   const [latestKind, setLatestKind] = useState<LatestKind>("run");
   const [submitting, setSubmitting] = useState(false);
@@ -110,6 +111,7 @@ export default function ProblemPage() {
   const [activeRun, setActiveRun] = useState<RunExecution | null>(null);
   const [activeSubmission, setActiveSubmission] = useState<Submission | null>(null);
   const [latestError, setLatestError] = useState<string>("");
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
   const load = async () => {
     const response = await fetchContestDetail(params.id);
@@ -245,6 +247,16 @@ export default function ProblemPage() {
   if (loading) return <LoadingState label="Loading problem..." />;
   if (!problem || !detail) return <div className="text-rose-400">Problem not found in this contest.</div>;
 
+  if (!isAllowedParticipant) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 text-slate-200">
+        <p className="text-lg font-semibold text-white">You cannot open this problem yet.</p>
+        <p className="mt-2 text-sm text-slate-400">Problem pages are available only to the organiser and approved participants.</p>
+        <Link href={`/contest/${detail.contest.id}`} className="mt-4 inline-flex rounded-xl border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">Back to contest</Link>
+      </div>
+    );
+  }
+
   const runResultView = activeRun && latestKind === "run" ? (
     <div className="space-y-3 text-sm">
       <div className="grid gap-2 text-xs text-slate-300 sm:grid-cols-2">
@@ -294,9 +306,45 @@ export default function ProblemPage() {
     </div>
   ) : null;
 
+
+
+  const submissionCodeModal = selectedSubmission ? (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 px-5 py-4">
+          <div>
+            <p className="text-lg font-semibold text-slate-100">Submitted code</p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span>Submission {selectedSubmission.id}</span>
+              <span>•</span>
+              <span>{selectedSubmission.language}</span>
+              <span>•</span>
+              <span>{new Date(selectedSubmission.submittedAt).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(selectedSubmission.sourceCode ?? ""); } catch {} }} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">
+              <CopyIcon size={14} />
+              Copy code
+            </button>
+            <button type="button" onClick={() => setSelectedSubmission(null)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white">
+              Close
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          <pre className="min-h-full overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-black/40 p-4 text-sm leading-6 text-emerald-100">{selectedSubmission.sourceCode || "// Submitted code unavailable"}</pre>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+
   return (
-    <div ref={containerRef} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-      <div className="flex h-[calc(100vh-88px)] min-h-[660px] flex-col overflow-hidden lg:flex-row">
+    <>
+      {submissionCodeModal}
+      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+      <div className="flex h-[calc(100dvh-112px)] min-h-[620px] flex-col overflow-hidden lg:flex-row">
         <section className="flex h-full min-h-0 w-full min-w-[320px] flex-col lg:min-w-0 lg:w-[var(--left-width)]" style={{ ["--left-width" as any]: `${leftWidth}%` }}>
           <div className="border-b border-slate-800 bg-slate-950/70 px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -387,6 +435,12 @@ export default function ProblemPage() {
                         <p>Runtime: <span className="text-slate-200">{submission.executionMs} ms</span></p>
                         <p>Memory: <span className="text-slate-200">{submission.memoryKb ?? 0} KB</span></p>
                       </div>
+                      <div className="mt-3">
+                        <button type="button" onClick={() => setSelectedSubmission(submission)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-100 hover:border-slate-500">
+                          <CheckCircleIcon size={14} />
+                          View submitted code
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -402,7 +456,7 @@ export default function ProblemPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Code editor</h2>
-                <p className="text-xs text-slate-500">Run uses a selected sample by default. Submit judges hidden tests only.</p>
+                <p className="text-xs text-slate-500">Run uses the sample test case by default. Submit checks hidden tests only.</p>
               </div>
               <select value={languageId} onChange={(event) => handleLanguageChange(Number(event.target.value))} disabled={judgePending} className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
                 {availableLanguages.map((language) => <option key={language.id} value={language.id}>{language.label}</option>)}
@@ -412,14 +466,14 @@ export default function ProblemPage() {
 
           <div className="min-h-0 flex-1 overflow-hidden p-4">
             <div className="flex h-full min-h-0 flex-col">
-              <div className="min-h-[240px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60" style={{ height: `${editorHeight}%` }}>
+              <div className="min-h-[220px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60" style={{ height: `${editorHeight}%` }}>
                 <MonacoCodeEditor key={`${problem.id}-${selectedLanguage.id}`} language={selectedLanguage.monaco} value={code} onChange={handleEditorChange} />
               </div>
 
               <div role="separator" aria-orientation="horizontal" onMouseDown={() => setDragging("horizontal")} className="my-3 h-1.5 shrink-0 cursor-row-resize rounded bg-slate-800 transition hover:bg-emerald-500/70" />
 
-              <div className="min-h-[220px] overflow-hidden" style={{ height: `${100 - editorHeight}%` }}>
-                <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="min-h-[200px] overflow-hidden" style={{ height: `${100 - editorHeight}%` }}>
+                <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
                   <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80 p-3">
                     <div className="flex items-center justify-between gap-2 shrink-0">
                       <label className="text-sm font-medium text-slate-300">Run configuration</label>
@@ -429,30 +483,29 @@ export default function ProblemPage() {
                       </label>
                     </div>
                     <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                      {!useCustomInput ? (
-                        publicTestCases.length > 1 ? (
-                          <label className="block text-sm text-slate-300">
-                            Sample case
-                            <select value={selectedSampleId} onChange={(event) => setSelectedSampleId(event.target.value)} disabled={judgePending} className="mt-2 w-full rounded-lg border border-slate-700 bg-black/30 p-3 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-70">
-                              {publicTestCases.map((sample, index) => <option key={sample.id} value={sample.id}>{`Sample case ${index + 1}`}</option>)}
-                            </select>
-                          </label>
-                        ) : (
-                          <div className="rounded-lg border border-slate-800 bg-black/20 p-3 text-sm text-slate-300">
-                            Run will use the single sample test case shown in the statement.
-                          </div>
-                        )
-                      ) : null}
-                      <label className="block text-sm font-medium text-slate-300">Custom input</label>
-                      <textarea value={customInput} onChange={(event) => setCustomInput(event.target.value)} placeholder="Custom input for Run" disabled={judgePending || !useCustomInput} className="h-36 w-full rounded-lg border border-slate-700 bg-black/30 p-3 text-sm text-slate-100 outline-none disabled:cursor-not-allowed disabled:opacity-50" />
-                      {!useCustomInput && chosenSample ? (
-                        <p className="text-xs text-slate-400">Run will use the selected sample test case and compare your output against the expected sample output.</p>
-                      ) : null}
+                  {!useCustomInput ? (
+                    publicTestCases.length > 1 ? (
+                      <label className="block text-sm text-slate-300">
+                        Sample case
+                        <select value={selectedSampleId} onChange={(event) => setSelectedSampleId(event.target.value)} disabled={judgePending} className="mt-2 w-full rounded-lg border border-slate-700 bg-black/30 p-3 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-70">
+                          {publicTestCases.map((sample, index) => <option key={sample.id} value={sample.id}>{`Sample case ${index + 1}`}</option>)}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="rounded-lg border border-slate-800 bg-black/20 p-3 text-sm text-slate-300">
+                        Run will use the single sample test case shown in the statement.
+                      </div>
+                    )
+                  ) : null}
+                  <label className="block text-sm font-medium text-slate-300">Custom input</label>
+                  <textarea value={customInput} onChange={(event) => setCustomInput(event.target.value)} placeholder="Custom input for Run" disabled={judgePending || !useCustomInput} className="h-36 w-full rounded-lg border border-slate-700 bg-black/30 p-3 text-sm text-slate-100 outline-none disabled:cursor-not-allowed disabled:opacity-50" />
+                  {!useCustomInput && chosenSample ? (
+                    <p className="text-xs text-slate-400">Run will use the selected sample test case and compare your output against the expected sample output.</p>
+                  ) : null}
                     </div>
                   </div>
-
                   <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-                    <div className="flex h-full min-h-0 flex-1 flex-col">
+                  <div className="flex h-full min-h-0 flex-1 flex-col">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="text-sm font-medium text-slate-100">Latest result</h3>
@@ -466,14 +519,24 @@ export default function ProblemPage() {
                     </div>
 
                     <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg bg-black/40 p-3 pb-4">
-                      {latestError ? <p className="text-sm text-rose-300">{latestError}</p> : null}
+                      {latestError ? (
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                          <AlertIcon size={14} />
+                          {latestError}
+                        </div>
+                      ) : null}
                       {!latestRecord && !latestError ? <p className="text-sm text-slate-400">Latest judge result will appear here.</p> : null}
-                      {latestRecord?.pipelineStatus === "queued" || latestRecord?.pipelineStatus === "processing" ? <p className="text-sm text-amber-300">{latestKind === "run" ? "Run pending..." : "Submission pending..."} wait until the judge finishes.</p> : null}
+                      {latestRecord?.pipelineStatus === "queued" || latestRecord?.pipelineStatus === "processing" ? (
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                          <span className="h-2 w-2 rounded-full bg-amber-300 animate-pulse" />
+                          {latestKind === "run" ? "Run pending..." : "Submission pending..."} wait until the judge finishes.
+                        </div>
+                      ) : null}
                       {runResultView}
                       {submissionResultView}
                     </div>
 
-                    <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/95 p-3">
+                    <div className="mt-3 flex shrink-0 flex-col gap-3 rounded-lg border border-slate-800 bg-slate-950/95 p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap items-center gap-2">
                       <button
                         className="rounded-md bg-slate-100 px-5 py-2 text-sm font-medium text-slate-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -539,14 +602,16 @@ export default function ProblemPage() {
                         {!judgePending && canSubmit ? <span>Language: <span className="text-slate-200">{selectedLanguage.label}</span></span> : null}
                       </div>
                     </div>
-                    </div>
                   </div>
-                </div>
               </div>
             </div>
           </div>
+          </div>
+          </div>
+
         </section>
       </div>
     </div>
+    </>
   );
 }

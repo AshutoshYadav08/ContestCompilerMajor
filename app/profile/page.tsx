@@ -38,8 +38,8 @@ export default function ProfilePage() {
     <PageScaffold
       title="Profile"
       titleIcon={<UserIcon />}
-      description="Manage the profile details shown across contests and standings."
-      bodyClassName="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]"
+      description="Manage the name and details other users see across contests and submissions."
+      bodyClassName="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]"
     >
       <aside className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
         <div className="flex items-start gap-4">
@@ -56,12 +56,12 @@ export default function ProfilePage() {
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
             <ShieldIcon size={16} className="text-emerald-300" />
-            Identity rules
+            Profile tips
           </div>
           <ul className="mt-3 space-y-2 text-sm text-slate-400">
             <li>• Username must stay unique across the platform.</li>
             <li>• Lowercase letters, numbers, and underscores work best.</li>
-            <li>• This handle appears in standings, lobby, and contest feeds.</li>
+            <li>• This handle appears in standings, join requests, and submission updates.</li>
           </ul>
         </div>
 
@@ -101,7 +101,7 @@ export default function ProfilePage() {
       >
         <div className="shrink-0 border-b border-slate-800 px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-100">Basic details</h2>
-          <p className="mt-1 text-sm text-slate-400">Keep your contest identity tidy before you start joining or hosting events.</p>
+          <p className="mt-1 text-sm text-slate-400">Keep your contest identity clear and easy to recognise.</p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -131,7 +131,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="shrink-0 border-t border-slate-800 bg-slate-950/80 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-sm text-slate-300">
               {message ? (
                 message.toLowerCase().includes("success") ? (
@@ -140,9 +140,9 @@ export default function ProfilePage() {
                   <AlertIcon size={16} className="text-amber-300" />
                 )
               ) : null}
-              <span>{message || "Save once to update your public contest identity."}</span>
+              <span>{message || "Save your changes to update how your profile appears in contests."}</span>
             </div>
-            <button type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={saving} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto w-full">
               {saving ? "Saving..." : "Save profile"}
             </button>
           </div>

@@ -146,12 +146,12 @@ export default function CreateContestPage() {
     <PageScaffold
       title="Create Contest"
       titleIcon={<SparklesIcon />}
-      description={<span>Set the schedule, add problems, and publish when ready.</span>}
+      description={<span>Set the details, add problems, and publish when everything is ready.</span>}
       bodyClassName="p-0"
     >
       <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
         <div className="sticky top-0 z-20 shrink-0 border-b border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-2">
               {tabs.map((tab) => (
                 <button
@@ -165,8 +165,8 @@ export default function CreateContestPage() {
                 </button>
               ))}
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-400">
-              {activeTab === "contest" ? "Schedule, registration, and penalties" : "Problem authoring and hidden-judge setup"}
+            <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-400 sm:max-w-xs">
+              {activeTab === "contest" ? "Set timing, access, and rules" : "Add problem details and test cases"}
             </div>
           </div>
           {formError ? (
@@ -178,13 +178,13 @@ export default function CreateContestPage() {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {activeTab === "contest" ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:col-span-2 xl:col-span-3">
                 <div className="flex items-center gap-2 text-slate-200">
                   <ShieldIcon size={16} className="text-emerald-300" />
                   <span className="font-medium">Contest shell</span>
                 </div>
-                <p className="mt-2 text-sm text-slate-400">You no longer need clutter like visibility or freeze settings here. The contest is driven by schedule, registration mode, and scoring rules.</p>
+                <p className="mt-2 text-sm text-slate-400">Choose the schedule, access mode, and scoring rules. Everything else follows from these basics.</p>
               </div>
               <Field label="Contest name">
                 <input value={name} onChange={(e) => setName(e.target.value)} className={inputClassName} placeholder="Weekly Algo Arena" required />
@@ -252,10 +252,10 @@ export default function CreateContestPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-slate-300">
               {successHint ? <CheckCircleIcon size={16} className="text-emerald-300" /> : <ClockIcon size={16} className="text-slate-500" />}
-              <span>{successHint || "Action buttons stay fixed here while the form content scrolls."}</span>
+              <span>{successHint || "Your save and cancel buttons stay here so they are always easy to reach."}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <button type="button" onClick={() => router.back()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500 w-full sm:w-auto">
                 <ArrowLeftIcon size={16} /> Cancel
               </button>
               <button type="submit" disabled={!canSubmit || saving} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">

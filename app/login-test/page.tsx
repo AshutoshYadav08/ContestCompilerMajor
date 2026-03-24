@@ -13,7 +13,7 @@ export default function LoginTestPage() {
   return (
     <PageScaffold
       title="Auth status"
-      description="Use this page to verify sign-in and profile sync."
+      description="This page helps verify your Clerk session and synced app profile."
       bodyClassName="space-y-6"
     >
       {user ? (

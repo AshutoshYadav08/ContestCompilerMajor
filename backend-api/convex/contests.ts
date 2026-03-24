@@ -122,10 +122,14 @@ export const detail = query({
         ...request,
         participant: users.find((user: any) => user.id === request.participantId)
       })),
-      events: submissions.map((submission: any) => ({
-        ...submission,
-        participantName: users.find((user: any) => user.id === submission.participantId)?.name ?? submission.participantId
-      })),
+      events: submissions.map((submission: any) => {
+        const participant = users.find((user: any) => user.id === submission.participantId);
+        return {
+          ...submission,
+          participant,
+          participantName: participant?.username ? `@${participant.username}` : participant?.name ?? submission.participantId
+        };
+      }),
       problemStats: getProblemStats(contest, problems.map((problem) => ({ id: problem.id, title: problem.title })), submissions)
     };
   }
@@ -201,6 +205,11 @@ export const requestJoin = mutation({
 
     if (contest.participants.includes(args.participantId)) {
       return { ok: true, autoApproved: true };
+    }
+
+    const phase = getContestPhase(contest);
+    if (phase === "ended") {
+      throw new Error("This contest has already ended. New participants cannot join now.");
     }
 
     const existing = await ctx.db.query("joinRequests").withIndex("by_contest", (q) => q.eq("contestId", args.contestId)).collect();

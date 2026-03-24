@@ -14,7 +14,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <Providers>
           <Navbar />
-          <main className="mx-auto max-w-[1600px] px-4 pb-6 pt-20 md:pt-[72px]">{children}</main>
+          <main className="mx-auto max-w-[1600px] px-4 pb-6 pt-[172px] sm:pt-[178px] md:pt-[84px]">{children}</main>
         </Providers>
       </body>
     </html>

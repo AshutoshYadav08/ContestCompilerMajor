@@ -55,7 +55,7 @@ export default function HistoryParticipationPage() {
       title="Participation History"
       titleIcon={<TrophyIcon />}
       description="See the contests you joined and jump back in quickly."
-      bodyClassName="grid gap-4 xl:grid-cols-2"
+      bodyClassName="grid gap-4 lg:grid-cols-2"
     >
       {contests.map((contest) => {
         const phase = getContestPhase(contest);
@@ -91,7 +91,7 @@ export default function HistoryParticipationPage() {
               </span>
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-800 pt-4">
+            <div className="mt-5 flex flex-col items-start gap-3 border-t border-slate-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-slate-400">Contest id: <span className="font-mono text-slate-300">{contest.id}</span></p>
               <Link href={`/contest/${contest.id}`} className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600">
                 {getContestHistoryCta("participant", phase)} <ArrowRightIcon size={15} />
@@ -100,7 +100,7 @@ export default function HistoryParticipationPage() {
           </div>
         );
       })}
-      {contests.length === 0 && <p>No participation found yet.</p>}
+      {contests.length === 0 && <p>You have not joined any contests yet.</p>}
     </PageScaffold>
   );
 }
