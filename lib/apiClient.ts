@@ -1,5 +1,5 @@
 import { Contest, Problem, RunExecution, StandingsRow, Submission, User } from "@/types";
-
+// error resolved
 export type ContestResponse = {
   contest: Contest;
   phase: "upcoming" | "running" | "ended";
